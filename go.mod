@@ -1,4 +1,4 @@
-module echo-server
+module github.com/thunderbird86/go-sandbox
 
 go 1.23.3
 

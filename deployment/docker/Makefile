@@ -13,6 +13,13 @@ DOCKER_BUILD ?= $(DOCKER) build
 DOCKER_COMPOSE ?= $(DOCKER) compose
 DOCKER_IMAGE_LS ?= $(DOCKER) image ls --format '{{.Repository}}:{{.Tag}}'
 
+package-base:
+	($(DOCKER_IMAGE_LS) | grep -q '$(BASE_IMAGE)$$') \
+		|| $(DOCKER_BUILD) \
+			--build-arg root_image=$(ROOT_IMAGE) \
+			--build-arg certs_image=$(CERTS_IMAGE) \
+			--tag $(BASE_IMAGE) \
+			deployment/docker/base
 
 package-builder:
 	($(DOCKER_IMAGE_LS) | grep -q '$(BUILDER_IMAGE)$$') \
@@ -25,8 +32,8 @@ app-via-docker: package-builder
 	mkdir -p gocache-for-docker
 	$(DOCKER_RUN) --rm \
 		--user $(shell id -u):$(shell id -g) \
-		--mount type=bind,src="$(shell pwd)",dst=/VictoriaMetrics \
-		-w /VictoriaMetrics \
+		--mount type=bind,src="$(shell pwd)",dst=/go-sandbox \
+		-w /go-sandbox \
 		--mount type=bind,src="$(shell pwd)/gocache-for-docker",dst=/gocache \
 		--env GOCACHE=/gocache \
 		$(DOCKER_OPTS) \
@@ -35,3 +42,16 @@ app-via-docker: package-builder
 			-ldflags "-extldflags '-static' $(GO_BUILDINFO)" \
 			-tags 'netgo osusergo musl' \
 			-o bin/$(APP_NAME)$(APP_SUFFIX)-prod $(PKG_PREFIX)/app/$(APP_NAME)
+
+package-via-docker: package-base
+	($(DOCKER_IMAGE_LS) | grep -q '$(DOCKER_NAMESPACE)/$(APP_NAME):$(PKG_TAG)$(APP_SUFFIX)$(RACE)$$') || (\
+		$(MAKE) app-via-docker && \
+		$(DOCKER_BUILD) \
+			--build-arg src_binary=$(APP_NAME)$(APP_SUFFIX)-prod \
+			--build-arg base_image=$(BASE_IMAGE) \
+			--label "org.opencontainers.image.source=https://github.com/thunderbird86/go-sandbox" \
+			--label "org.opencontainers.image.title=$(APP_NAME)" \
+			--label "org.opencontainers.image.version=$(PKG_TAG)" \
+			--label "org.opencontainers.image.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+			--tag $(DOCKER_NAMESPACE)/$(APP_NAME):$(PKG_TAG)$(APP_SUFFIX)$(RACE) \
+			-f app/$(APP_NAME)/deployment/Dockerfile bin)

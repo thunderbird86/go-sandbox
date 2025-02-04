@@ -23,7 +23,10 @@ include app/*/Makefile
 include deployment/*/Makefile
 
 all: \
-	echo-server-prod \
+	echo-server-prod
+
+package: \
+	package-echo-server
 
 check-all: fmt vet golangci-lint govulncheck
 

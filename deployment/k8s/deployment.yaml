@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: echo-server
+  name: echo-server
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: echo-server
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: echo-server
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: echo-server
+          image:  ""
+          imagePullPolicy: IfNotPresent
+          env: []
+          ports:
+            - name: service
+              containerPort: 1323
+              protocol: TCP
+          livenessProbe:
+            successThreshold: 1
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: service
+            initialDelaySeconds: 60
+            timeoutSeconds: 30
+          readinessProbe:
+            periodSeconds: 30
+            failureThreshold: 3
+            successThreshold: 3
+            httpGet:
+              path: /health
+              port: service
+              scheme: HTTP
+
+
